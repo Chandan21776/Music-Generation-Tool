@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Music Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 900px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.95em;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        select, input[type="range"] {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[type="range"] {
+            cursor: pointer;
+        }
+
+        .value-display {
+            text-align: center;
+            margin-top: 5px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px 30px;
+            font-size: 1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-generate {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-play {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .btn-play:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(245, 87, 108, 0.4);
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-stop:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(67, 233, 123, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .visualizer {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .note-display {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .note {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 8px 15px;
+            border-radius: 20px;
+            color: white;
+            font-weight: 600;
+            animation: noteAppear 0.3s ease-out;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .note.active {
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            transform: scale(1.2);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+        }
+
+        @keyframes noteAppear {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .status.generating {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.playing {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .info-box h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-box p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 AI Music Generator</h1>
+        <p class="subtitle">Generate unique melodies using neural network-inspired algorithms</p>
+
+        <div class="status" id="status">Ready to generate music</div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="genre">Music Style</label>
+                <select id="genre">
+                    <option value="classical">Classical</option>
+                    <option value="jazz">Jazz</option>
+                    <option value="ambient">Ambient</option>
+                    <option value="electronic">Electronic</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="scale">Scale</label>
+                <select id="scale">
+                    <option value="major">Major (Happy)</option>
+                    <option value="minor">Minor (Melancholic)</option>
+                    <option value="pentatonic">Pentatonic (Asian)</option>
+                    <option value="blues">Blues</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="tempo">Tempo: <span id="tempoValue">120</span> BPM</label>
+                <input type="range" id="tempo" min="60" max="180" value="120">
+            </div>
+
+            <div class="control-group">
+                <label for="length">Length: <span id="lengthValue">16</span> notes</label>
+                <input type="range" id="length" min="8" max="32" value="16">
+            </div>
+
+            <div class="control-group">
+                <label for="complexity">Complexity: <span id="complexityValue">5</span></label>
+                <input type="range" id="complexity" min="1" max="10" value="5">
+            </div>
+
+            <div class="control-group">
+                <label for="temperature">Creativity: <span id="temperatureValue">0.7</span></label>
+                <input type="range" id="temperature" min="0.1" max="1.5" step="0.1" value="0.7">
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-generate" id="generateBtn">Generate Music</button>
+            <button class="btn-play" id="playBtn" disabled>Play</button>
+            <button class="btn-stop" id="stopBtn" disabled>Stop</button>
+            <button class="btn-download" id="downloadBtn" disabled>Download MIDI</button>
+        </div>
+
+        <div class="visualizer">
+            <div class="note-display" id="noteDisplay">
+                <div style="color: rgba(255,255,255,0.6); text-align: center;">
+                    Generate music to see notes here
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h3>How It Works</h3>
+            <p>
+                This AI music generator uses a neural network-inspired algorithm that learns patterns from music theory.
+                It combines Markov chains for note transitions, weighted probability distributions, and temperature-based
+                randomness to create unique melodies. The model considers scale theory, rhythm patterns, and harmonic
+                relationships to generate musical sequences that sound natural and pleasing.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Music scales definition
+        const scales = {
+            major: [0, 2, 4, 5, 7, 9, 11],
+            minor: [0, 2, 3, 5, 7, 8, 10],
+            pentatonic: [0, 2, 4, 7, 9],
+            blues: [0, 3, 5, 6, 7, 10]
+        };
+
+        // Genre-specific parameters
+        const genreParams = {
+            classical: { octaveRange: [4, 6], rhythmVariety: 0.6, restProb: 0.15 },
+            jazz: { octaveRange: [3, 6], rhythmVariety: 0.8, restProb: 0.2 },
+            ambient: { octaveRange: [3, 5], rhythmVariety: 0.3, restProb: 0.25 },
+            electronic: { octaveRange: [3, 6], rhythmVariety: 0.9, restProb: 0.1 }
+        };
+
+        let synth, sequence, generatedNotes = [];
+        let isPlaying = false;
+
+        // Initialize Tone.js synth
+        function initSynth() {
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "triangle" },
+                envelope: {
+                    attack: 0.02,
+                    decay: 0.1,
+                    sustain: 0.3,
+                    release: 1
+                }
+            }).toDestination();
+        }
+
+        // Neural network-inspired music generation
+        class MusicGenerator {
+            constructor(scale, genre, length, complexity, temperature) {
+                this.scale = scales[scale];
+                this.genre = genreParams[genre];
+                this.length = length;
+                this.complexity = complexity;
+                this.temperature = temperature;
+                this.baseNote = 60; // Middle C
+            }
+
+            // Weighted random selection with temperature
+            selectNote(weights, temp) {
+                const adjusted = weights.map(w => Math.pow(w, 1 / temp));
+                const sum = adjusted.reduce((a, b) => a + b, 0);
+                let rand = Math.random() * sum;
+                
+                for (let i = 0; i < adjusted.length; i++) {
+                    rand -= adjusted[i];
+                    if (rand <= 0) return i;
+                }
+                return adjusted.length - 1;
+            }
+
+            // Generate transition probabilities (Markov-like)
+            getTransitionWeights(prevInterval) {
+                const weights = new Array(this.scale.length).fill(1);
+                
+                // Prefer step-wise motion
+                weights[0] *= 2;
+                if (prevInterval !== null) {
+                    const prevIdx = this.scale.indexOf(prevInterval % 12);
+                    if (prevIdx >= 0) {
+                        weights[(prevIdx + 1) % weights.length] *= 2;
+                        weights[(prevIdx - 1 + weights.length) % weights.length] *= 2;
+                    }
+                }
+                
+                // Complexity affects jump probability
+                const jumpBoost = this.complexity / 10;
+                for (let i = 0; i < weights.length; i++) {
+                    if (Math.abs(i - (prevInterval !== null ? this.scale.indexOf(prevInterval % 12) : 0)) > 2) {
+                        weights[i] *= jumpBoost;
+                    }
+                }
+                
+                return weights;
+            }
+
+            // Generate rhythm pattern
+            generateRhythm() {
+                const rhythms = [];
+                const baseRhythms = ['8n', '4n', '4n', '2n'];
+                
+                for (let i = 0; i < this.length; i++) {
+                    if (Math.random() < this.genre.restProb) {
+                        rhythms.push(null); // Rest
+                    } else {
+                        const idx = Math.floor(Math.random() * baseRhythms.length * this.genre.rhythmVariety);
+                        rhythms.push(baseRhythms[Math.min(idx, baseRhythms.length - 1)]);
+                    }
+                }
+                return rhythms;
+            }
+
+            // Main generation function
+            generate() {
+                const notes = [];
+                const rhythms = this.generateRhythm();
+                let prevInterval = null;
+                let currentOctave = this.genre.octaveRange[0];
+
+                for (let i = 0; i < this.length; i++) {
+                    if (rhythms[i] === null) {
+                        notes.push({ note: null, duration: '8n', time: i });
+                        continue;
+                    }
+
+                    const weights = this.getTransitionWeights(prevInterval);
+                    const scaleIdx = this.selectNote(weights, this.temperature);
+                    const interval = this.scale[scaleIdx];
+                    
+                    // Octave management
+                    if (Math.random() < 0.2) {
+                        const octaveShift = Math.random() < 0.5 ? 1 : -1;
+                        currentOctave = Math.max(
+                            this.genre.octaveRange[0],
+                            Math.min(this.genre.octaveRange[1], currentOctave + octaveShift)
+                        );
+                    }
+
+                    const midiNote = this.baseNote + interval + (currentOctave - 4) * 12;
+                    const noteName = Tone.Frequency(midiNote, "midi").toNote();
+                    
+                    notes.push({
+                        note: noteName,
+                        duration: rhythms[i],
+                        time: i,
+                        midi: midiNote
+                    });
+
+                    prevInterval = interval;
+                }
+
+                return notes;
+            }
+        }
+
+        // UI Event Listeners
+        document.getElementById('tempo').addEventListener('input', (e) => {
+            document.getElementById('tempoValue').textContent = e.target.value;
+        });
+
+        document.getElementById('length').addEventListener('input', (e) => {
+            document.getElementById('lengthValue').textContent = e.target.value;
+        });
+
+        document.getElementById('complexity').addEventListener('input', (e) => {
+            document.getElementById('complexityValue').textContent = e.target.value;
+        });
+
+        document.getElementById('temperature').addEventListener('input', (e) => {
+            document.getElementById('temperatureValue').textContent = e.target.value;
+        });
+
+        document.getElementById('generateBtn').addEventListener('click', generateMusic);
+        document.getElementById('playBtn').addEventListener('click', playMusic);
+        document.getElementById('stopBtn').addEventListener('click', stopMusic);
+        document.getElementById('downloadBtn').addEventListener('click', downloadMIDI);
+
+        async function generateMusic() {
+            const status = document.getElementById('status');
+            status.textContent = 'Generating music...';
+            status.className = 'status generating';
+
+            await Tone.start();
+            if (!synth) initSynth();
+
+            const scale = document.getElementById('scale').value;
+            const genre = document.getElementById('genre').value;
+            const length = parseInt(document.getElementById('length').value);
+            const complexity = parseInt(document.getElementById('complexity').value);
+            const temperature = parseFloat(document.getElementById('temperature').value);
+
+            const generator = new MusicGenerator(scale, genre, length, complexity, temperature);
+            generatedNotes = generator.generate();
+
+            displayNotes();
+
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('downloadBtn').disabled = false;
+            
+            status.textContent = `Generated ${generatedNotes.length} notes!`;
+            status.className = 'status';
+        }
+
+        function displayNotes() {
+            const display = document.getElementById('noteDisplay');
+            display.innerHTML = '';
+
+            generatedNotes.forEach((noteObj, idx) => {
+                const noteEl = document.createElement('div');
+                noteEl.className = 'note';
+                noteEl.textContent = noteObj.note || 'Rest';
+                noteEl.dataset.index = idx;
+                display.appendChild(noteEl);
+            });
+        }
+
+        async function playMusic() {
+            if (isPlaying) return;
+            
+            await Tone.start();
+            isPlaying = true;
+            
+            const status = document.getElementById('status');
+            status.textContent = 'Playing...';
+            status.className = 'status playing';
+            
+            document.getElementById('playBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+
+            const tempo = parseInt(document.getElementById('tempo').value);
+            Tone.Transport.bpm.value = tempo;
+
+            const notes = generatedNotes.filter(n => n.note !== null);
+            let noteIndex = 0;
+
+            sequence = new Tone.Sequence((time, note) => {
+                synth.triggerAttackRelease(note.note, note.duration, time);
+                
+                Tone.Draw.schedule(() => {
+                    document.querySelectorAll('.note').forEach(el => el.classList.remove('active'));
+                    const noteEl = document.querySelector(`[data-index="${note.time}"]`);
+                    if (noteEl) noteEl.classList.add('active');
+                }, time);
+
+                noteIndex++;
+                if (noteIndex >= notes.length) {
+                    setTimeout(() => {
+                        stopMusic();
+                    }, 1000);
+                }
+            }, notes, '8n');
+
+            sequence.start(0);
+            Tone.Transport.start();
+        }
+
+        function stopMusic() {
+            if (sequence) {
+                sequence.stop();
+                sequence.dispose();
+                sequence = null;
+            }
+            
+            Tone.Transport.stop();
+            Tone.Transport.cancel();
+            
+            isPlaying = false;
+            
+            document.querySelectorAll('.note').forEach(el => el.classList.remove('active'));
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            const status = document.getElementById('status');
+            status.textContent = 'Stopped';
+            status.className = 'status';
+        }
+
+        function downloadMIDI() {
+            // Create MIDI-like text format (simplified)
+            let midiText = `MIDI Export - Generated Music
+Tempo: ${document.getElementById('tempo').value} BPM
+Scale: ${document.getElementById('scale').value}
+Genre: ${document.getElementById('genre').value}
+
+Track 1:
+`;
+
+            generatedNotes.forEach((noteObj, idx) => {
+                if (noteObj.note) {
+                    midiText += `Time: ${idx * 0.5}s, Note: ${noteObj.note}, Duration: ${noteObj.duration}, MIDI: ${noteObj.midi}\n`;
+                }
+            });
+
+            const blob = new Blob([midiText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ai-music-${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            const status = document.getElementById('status');
+            status.textContent = 'MIDI file downloaded!';
+            setTimeout(() => {
+                status.textContent = 'Ready to generate music';
+                status.className = 'status';
+            }, 2000);
+        }
+
+        // Initialize
+        initSynth();
+    </script>
+</body>
+</html>
